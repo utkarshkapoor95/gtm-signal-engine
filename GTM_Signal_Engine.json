@@ -1,0 +1,801 @@
+{
+  "name": "GTM Signal Engine",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 4
+            }
+          ]
+        }
+      },
+      "id": "21906183-4428-4b01-8938-eef316ff4864",
+      "name": "Schedule - Every 4 Hours",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -1264,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "projectId": {
+          "__rl": true,
+          "value": "gtm-signal-engine-512815",
+          "mode": "list"
+        },
+        "sqlQuery": "SELECT * FROM `gtm-signal-engine-512815.gtm_signals.scored_signals` WHERE signal_score >= 50 ORDER BY signal_score DESC",
+        "options": {}
+      },
+      "id": "60e1f76c-709f-43e7-a848-289f15fd599e",
+      "name": "BigQuery - Get Scored Signals",
+      "type": "n8n-nodes-base.googleBigQuery",
+      "typeVersion": 2,
+      "position": [
+        -1008,
+        240
+      ],
+      "credentials": {
+        "googleApi": {
+          "id": "J5diItfPRdlhosm4",
+          "name": "Google Service Account account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "has-results",
+              "leftValue": "={{ $json.company_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "751e05c3-4aaa-4f52-bf9f-d57eff2b5d98",
+      "name": "Any Results?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -768,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "7040228417",
+        "text": "=📊 GTM Signal Engine\n{{ new Date().toLocaleDateString() }}\n\n✅ No new signals detected.\nAll accounts are below threshold.\n\nNext check in 4 hours.",
+        "additionalFields": {}
+      },
+      "id": "bf83a5d6-ab90-4256-9658-78c5a37d1ead",
+      "name": "Telegram - No Signals",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -48,
+        432
+      ],
+      "webhookId": "8a526e66-3a0a-4a96-b3b7-c41d1211cac4",
+      "credentials": {
+        "telegramApi": {
+          "id": "zK9xFZKEr3FVogEJ",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "set-email",
+              "name": "email",
+              "value": "={{ $json.company_id.toLowerCase() }}@example.com",
+              "type": "string"
+            },
+            {
+              "id": "set-firstname",
+              "name": "firstname",
+              "value": "={{ $json.company_name }}",
+              "type": "string"
+            },
+            {
+              "id": "set-lastname",
+              "name": "lastname",
+              "value": "={{ $json.signal_tier + ' - Score ' + $json.signal_score }}",
+              "type": "string"
+            },
+            {
+              "id": "45f05c7a-3f8a-4c64-a577-fe63b613d082",
+              "name": "company_name",
+              "value": "={{ $json.company_name }}",
+              "type": "string"
+            },
+            {
+              "id": "90a62118-7165-4e18-8223-2c2225aa19b0",
+              "name": "signal_score",
+              "value": "={{ $json.signal_score }}",
+              "type": "string"
+            },
+            {
+              "id": "0ff8e0c5-e1b8-4b92-b29d-1f4e1d2d63b0",
+              "name": "signal_tier",
+              "value": "={{ $json.signal_tier }}",
+              "type": "string"
+            },
+            {
+              "id": "98722c49-24c1-4c23-9459-9cf0bec898fb",
+              "name": "signal_type",
+              "value": "={{ $json.signal_type }}",
+              "type": "string"
+            },
+            {
+              "id": "22167a85-9b0c-488e-92cd-c73a57562f18",
+              "name": "plan_type",
+              "value": "={{ $json.plan_type }}",
+              "type": "string"
+            },
+            {
+              "id": "78e8bbc5-fd4b-4853-9115-8954bd13de2d",
+              "name": "mrr",
+              "value": "={{ $json.mrr }}",
+              "type": "string"
+            },
+            {
+              "id": "eb4d9993-2297-43d6-bf81-d7030b156d2a",
+              "name": "seats_used",
+              "value": "={{ $json.seats_used }}",
+              "type": "string"
+            },
+            {
+              "id": "2038b2ef-4f71-4d9a-882e-89256766cfdb",
+              "name": "seats_purchased",
+              "value": "={{ $json.seats_purchased }}",
+              "type": "string"
+            },
+            {
+              "id": "f899573a-3b5a-484d-9e80-25bf817efa30",
+              "name": "seat_utilization_pct",
+              "value": "={{ $json.seat_utilization_pct }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "3015deb9-1dd4-47a4-93d7-5b9c43673df6",
+      "name": "Format Signal Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -528,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "batchSize": 10,
+        "options": {}
+      },
+      "id": "99168994-8d26-4e34-96c7-6f8af9176125",
+      "name": "Batch - 10 at a time",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -288,
+        16
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "appToken",
+        "email": "={{ $json.email }}",
+        "additionalFields": {
+          "customPropertiesUi": {
+            "customPropertiesValues": [
+              {
+                "property": "signal_score",
+                "value": "={{ $json.signal_score }}"
+              },
+              {
+                "property": "signal_type",
+                "value": "={{ $json.signal_type }}"
+              },
+              {
+                "property": "last_signal_date",
+                "value": "={{ new Date($json.last_signal_date).getTime() }}"
+              }
+            ]
+          },
+          "firstName": "={{ $json.firstname }}",
+          "lastName": "={{ $json.lastname }}"
+        },
+        "options": {}
+      },
+      "id": "c981c130-0569-4f17-90ed-5f72afb525aa",
+      "name": "HubSpot - Upsert Contact",
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2,
+      "position": [
+        -16,
+        0
+      ],
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "ldng8MxNxs5CktxS",
+          "name": "HubSpot Service Key account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nfunction getTier(item) {\n  return String(item.json.signal_tier || '').trim().toUpperCase();\n}\n\nconst critical = items.filter(i => getTier(i) === 'CRITICAL');\nconst hot = items.filter(i => getTier(i) === 'HOT');\nconst warm = items.filter(i => getTier(i) === 'WARM');\n\nconst MAX_LISTED = 25;\n\nfunction compactList(arr) {\n  let out = '';\n  const shown = arr.slice(0, MAX_LISTED);\n  for (const a of shown) {\n    out += `• ${a.json.company_name}: ${a.json.signal_score} | ${String(a.json.signal_type).replace(/_/g, ' ')}\\n`;\n  }\n  if (arr.length > MAX_LISTED) {\n    out += `...and ${arr.length - MAX_LISTED} more\\n`;\n  }\n  return out;\n}\n\nconst now = new Date();\nconst dateStr = now.toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });\nconst timeStr = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });\n\nlet msg = `📊 GTM SIGNAL ENGINE REPORT\\n`;\nmsg += `${dateStr} at ${timeStr}\\n`;\nmsg += `━━━━━━━━━━━━━━━━━━━━━━\\n\\n`;\nmsg += `📈 Total accounts flagged: ${items.length}\\n`;\nmsg += `🔴 Critical (85+): ${critical.length}\\n`;\nmsg += `🟠 Hot (70-84): ${hot.length}\\n`;\nmsg += `🟡 Warm (50-69): ${warm.length}\\n\\n`;\n\nif (critical.length > 0) {\n  msg += `━━ 🔴 CRITICAL ━━━━━━━━━\\n`;\n  msg += compactList(critical);\n  msg += `\\n`;\n}\n\nif (hot.length > 0) {\n  msg += `━━ 🟠 HOT ━━━━━━━━━━━━━\\n`;\n  msg += compactList(hot);\n  msg += `\\n`;\n}\n\nif (warm.length > 0) {\n  msg += `━━ 🟡 WARM ━━━━━━━━━━━━\\n`;\n  msg += compactList(warm);\n  msg += `\\n`;\n}\n\nmsg += `━━━━━━━━━━━━━━━━━━━━━━\\n`;\nmsg += `✅ ${items.length} contacts synced to HubSpot\\n`;\nmsg += `⏰ Next check in 4 hours`;\n\nreturn [{ json: { summary: msg, total: items.length, critical_count: critical.length, hot_count: hot.length, warm_count: warm.length } }];"
+      },
+      "id": "4ef5238a-b25a-4fff-984a-5930734f8260",
+      "name": "Build Signal Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -288,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "7040228417",
+        "text": "={{ $json.summary }}",
+        "additionalFields": {}
+      },
+      "id": "909bd49c-0547-4d52-8014-8fff2f7381e2",
+      "name": "Telegram - Signal Report",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -48,
+        240
+      ],
+      "webhookId": "0087e3c4-c057-4a64-b8bc-b3a158a3ed7b",
+      "credentials": {
+        "telegramApi": {
+          "id": "zK9xFZKEr3FVogEJ",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "0c727f5a-7577-4320-adf6-0cb53c1cc128",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1264,
+        736
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "7040228417",
+        "text": "=⚠️ GTM SIGNAL ENGINE ERROR\n\nWorkflow failed at: {{ $json.execution.error.node.name }}\nError: {{ $json.execution.error.message }}\nTime: {{ new Date().toLocaleString('en-IN') }}\n\nCheck n8n dashboard for details.",
+        "additionalFields": {}
+      },
+      "id": "fdd3db93-0767-4314-a86b-00769ed37dd3",
+      "name": "Telegram - Error Alert",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -944,
+        736
+      ],
+      "webhookId": "c19744d6-fac1-41da-bdf3-f28783c84b63",
+      "credentials": {
+        "telegramApi": {
+          "id": "zK9xFZKEr3FVogEJ",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "clear",
+        "documentId": {
+          "__rl": true,
+          "value": "1T5vkVEWrz7JH7LGlGd3WnlWUFr7sWRBNbfTBiclDjrE",
+          "mode": "list",
+          "cachedResultName": "results-20261029-003011",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1T5vkVEWrz7JH7LGlGd3WnlWUFr7sWRBNbfTBiclDjrE/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1136943456,
+          "mode": "list",
+          "cachedResultName": "results-20261029-003011",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1T5vkVEWrz7JH7LGlGd3WnlWUFr7sWRBNbfTBiclDjrE/edit#gid=1136943456"
+        },
+        "keepFirstRow": true
+      },
+      "id": "592911f2-7edd-425b-aeca-280a0d061a17",
+      "name": "Google Sheets - Clear Old Data",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        -976,
+        512
+      ],
+      "retryOnFail": true,
+      "executeOnce": true,
+      "credentials": {
+        "googleApi": {
+          "id": "J5diItfPRdlhosm4",
+          "name": "Google Service Account account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1T5vkVEWrz7JH7LGlGd3WnlWUFr7sWRBNbfTBiclDjrE",
+          "mode": "list",
+          "cachedResultName": "results-20261029-003011",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1T5vkVEWrz7JH7LGlGd3WnlWUFr7sWRBNbfTBiclDjrE/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1136943456,
+          "mode": "list",
+          "cachedResultName": "results-20261029-003011",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1T5vkVEWrz7JH7LGlGd3WnlWUFr7sWRBNbfTBiclDjrE/edit#gid=1136943456"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "company_id",
+              "displayName": "company_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "company_name",
+              "displayName": "company_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "last_signal_date",
+              "displayName": "last_signal_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "plan_type",
+              "displayName": "plan_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "mrr",
+              "displayName": "mrr",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "signup_date",
+              "displayName": "signup_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "daily_active_users",
+              "displayName": "daily_active_users",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "features_used",
+              "displayName": "features_used",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "api_calls",
+              "displayName": "api_calls",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "seats_purchased",
+              "displayName": "seats_purchased",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "seats_used",
+              "displayName": "seats_used",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "dau_7d_avg",
+              "displayName": "dau_7d_avg",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "seat_utilization_pct",
+              "displayName": "seat_utilization_pct",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "max_features_cumulative",
+              "displayName": "max_features_cumulative",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "has_usage_spike",
+              "displayName": "has_usage_spike",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "has_seat_crunch",
+              "displayName": "has_seat_crunch",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "has_feature_milestone",
+              "displayName": "has_feature_milestone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "spike_ratio",
+              "displayName": "spike_ratio",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "signals_firing",
+              "displayName": "signals_firing",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "signal_type",
+              "displayName": "signal_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "signal_score",
+              "displayName": "signal_score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "signal_tier",
+              "displayName": "signal_tier",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "6649e7fc-74b8-4923-a877-2ce81e6ec8f9",
+      "name": "Google Sheets - Write Fresh Data",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        -432,
+        528
+      ],
+      "executeOnce": false,
+      "credentials": {
+        "googleApi": {
+          "id": "J5diItfPRdlhosm4",
+          "name": "Google Service Account account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "chooseBranch",
+        "useDataOfInput": 2
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -672,
+        528
+      ],
+      "id": "1ee357aa-db16-47cb-9404-cdf7408e911e",
+      "name": "Merge"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule - Every 4 Hours": {
+      "main": [
+        [
+          {
+            "node": "BigQuery - Get Scored Signals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BigQuery - Get Scored Signals": {
+      "main": [
+        [
+          {
+            "node": "Any Results?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Google Sheets - Clear Old Data",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Any Results?": {
+      "main": [
+        [
+          {
+            "node": "Format Signal Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Telegram - No Signals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Signal Data": {
+      "main": [
+        [
+          {
+            "node": "Batch - 10 at a time",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Build Signal Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Batch - 10 at a time": {
+      "main": [
+        [
+          {
+            "node": "HubSpot - Upsert Contact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HubSpot - Upsert Contact": {
+      "main": [
+        [
+          {
+            "node": "Batch - 10 at a time",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Signal Report": {
+      "main": [
+        [
+          {
+            "node": "Telegram - Signal Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Telegram - Error Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets - Clear Old Data": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets - Write Fresh Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "5933ded4-b9b4-4655-9ba3-784877af95c0",
+  "meta": {
+    "instanceId": "3dd03cd204d7e8a369fffdc7ade793578428abdd9a7d3ce3d9e84bdfdafe1c51"
+  },
+  "nodeGroups": [],
+  "id": "dr1XmmbGzFS66Bu1",
+  "tags": [
+    {
+      "updatedAt": "2026-10-27T06:46:02.939Z",
+      "createdAt": "2026-10-27T06:46:02.939Z",
+      "id": "RoMcnDQ2vAQGiHar",
+      "name": "BigQuery"
+    },
+    {
+      "updatedAt": "2026-10-27T06:46:02.998Z",
+      "createdAt": "2026-10-27T06:46:02.998Z",
+      "id": "fs0Zh2GZaNSsznr0",
+      "name": "HubSpot"
+    },
+    {
+      "updatedAt": "2026-10-26T19:53:44.509Z",
+      "createdAt": "2026-10-26T19:53:44.509Z",
+      "id": "lb4uSnN8AdsZzRJL",
+      "name": "GTM Signal Engine"
+    }
+  ]
+}
