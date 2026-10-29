@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>GTM Signal Engine | Utkarsh Kapoor</title>
+<meta name="description" content="A GTM signal detection pipeline built with BigQuery SQL, n8n, HubSpot, and Looker Studio.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/sql.min.js"></script>
+<style>
+:root {
+  --bg: #0a0e16;
+  --bg-raised: #10151f;
+  --bg-code: #0d1119;
+  --border: #1d2535;
+  --text: #e6e9ef;
+  --text-dim: #8b93a7;
+  --text-faint: #566075;
+  --critical: #ff5c5c;
+  --hot: #ff9a3c;
+  --warm: #ffd93c;
+  --signal: #4fd1c5;
+  --signal-dim: #2a7a72;
+  color-scheme: dark;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: env(safe-area-inset-top, 0px);
+}
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  line-height: 1.6;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  -webkit-font-smoothing: antialiased;
+}
+.mono { font-family: 'JetBrains Mono', 'Consolas', monospace; }
+
+a { color: var(--signal); text-decoration: none; }
+a:hover { text-decoration: underline; }
+a:focus-visible, button:focus-visible { outline: 2px solid var(--signal); outline-offset: 3px; }
+
+.wrap {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+/* ===== HERO ===== */
+.hero {
+  position: relative;
+  padding: 100px 0 80px;
+  overflow: hidden;
+}
+.pulse-field {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 1px;
+  height: 1px;
+  pointer-events: none;
+  z-index: 0;
+}
+.pulse-ring {
+  position: absolute;
+  top: 0; left: 0;
+  border: 1px solid var(--signal-dim);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  animation: pulse-out 2.8s ease-out forwards;
+}
+.pulse-ring.r1 { width: 160px; height: 160px; animation-delay: 0.1s; }
+.pulse-ring.r2 { width: 160px; height: 160px; animation-delay: 0.6s; }
+.pulse-ring.r3 { width: 160px; height: 160px; animation-delay: 1.1s; }
+@keyframes pulse-out {
+  0% { transform: translate(-50%, -50%) scale(0.3); opacity: 0.7; }
+  100% { transform: translate(-50%, -50%) scale(6); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pulse-ring { animation: none; opacity: 0; }
+}
+
+.eyebrow {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-dim);
+  margin-bottom: 20px;
+}
+.dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--signal);
+  box-shadow: 0 0 8px var(--signal);
+}
+.dot.live { animation: blink 1.6s ease-in-out infinite; }
+@keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) { .dot.live { animation: none; } }
+
+h1 {
+  position: relative;
+  z-index: 1;
+  font-size: clamp(36px, 6vw, 54px);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.08;
+  max-width: 11ch;
+}
+
+.hero-sub {
+  position: relative;
+  z-index: 1;
+  margin-top: 20px;
+  font-size: 18px;
+  color: var(--text-dim);
+  max-width: 54ch;
+}
+
+.stat-row {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  gap: 28px;
+  margin-top: 40px;
+  flex-wrap: wrap;
+}
+.stat-num {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 1;
+}
+.stat-label {
+  font-size: 12px;
+  color: var(--text-faint);
+  margin-top: 6px;
+}
+.stat-critical .stat-num { color: var(--critical); }
+.stat-hot .stat-num { color: var(--hot); }
+.stat-signal .stat-num { color: var(--signal); }
+
+/* ===== LIVE STATUS STRIP ===== */
+.live-strip {
+  position: relative;
+  z-index: 1;
+  margin-top: 36px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--text-dim);
+  max-width: fit-content;
+}
+.live-strip .countdown {
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--signal);
+  font-weight: 600;
+}
+
+/* ===== SECTION ===== */
+section {
+  padding: 56px 0;
+  border-top: 1px solid var(--border);
+}
+h2 {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin-bottom: 18px;
+}
+p.lede {
+  font-size: 16px;
+  color: var(--text-dim);
+  max-width: 68ch;
+  margin-bottom: 8px;
+}
+
+/* ===== TELEGRAM PROOF CARD ===== */
+.proof-card {
+  margin-top: 24px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.proof-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-code);
+}
+.proof-avatar {
+  width: 30px; height: 30px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #4fd1c5, #2a7a72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+  color: #04201d;
+  flex-shrink: 0;
+}
+.proof-title { font-size: 13px; font-weight: 600; color: var(--text); }
+.proof-sub { font-size: 11px; color: var(--text-faint); }
+.proof-badge {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--signal);
+  background: rgba(79, 209, 197, 0.1);
+  border: 1px solid var(--signal-dim);
+  padding: 3px 9px;
+  border-radius: 20px;
+  font-family: 'JetBrains Mono', monospace;
+}
+.proof-body {
+  padding: 18px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12.5px;
+  line-height: 1.75;
+  color: var(--text-dim);
+  white-space: pre-wrap;
+  max-height: 320px;
+  overflow-y: auto;
+}
+.proof-body .hl-critical { color: var(--critical); font-weight: 600; }
+.proof-body .hl-hot { color: var(--hot); font-weight: 600; }
+.proof-body .hl-head { color: var(--text); font-weight: 600; }
+.proof-foot {
+  padding: 10px 18px;
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--text-faint);
+  display: flex;
+  justify-content: space-between;
+}
+
+/* ===== SIGNALS LIST ===== */
+.signal-list {
+  margin-top: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.signal-row {
+  display: grid;
+  grid-template-columns: 100px 1fr auto;
+  gap: 16px;
+  align-items: baseline;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--border);
+}
+.signal-row:first-child { border-top: 1px solid var(--border); }
+.signal-pts {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 15px;
+  font-weight: 600;
+}
+.signal-pts.sp-spike { color: var(--critical); }
+.signal-pts.sp-crunch { color: var(--hot); }
+.signal-pts.sp-feature { color: var(--signal); }
+.signal-desc { font-size: 14px; color: var(--text) }
+.signal-desc .name { font-weight: 600; display: block; margin-bottom: 2px; }
+.signal-tech {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--text-faint);
+}
+
+.tier-line {
+  margin-top: 24px;
+  display: flex;
+  gap: 2px;
+  height: 10px;
+  border-radius: 5px;
+  overflow: hidden;
+}
+.tier-seg { height: 100%; }
+.tier-seg.critical { background: var(--critical); flex: 25; }
+.tier-seg.hot { background: var(--hot); flex: 19; }
+.tier-seg.warm { background: var(--warm); flex: 0.1; }
+.tier-seg.cold { background: var(--text-faint); opacity: 0.25; flex: 31; }
+.tier-key {
+  display: flex;
+  gap: 20px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+.tier-key span { display: flex; align-items: center; gap: 6px; }
+.tier-key i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+
+/* ===== CODE ===== */
+.code-card {
+  margin-top: 24px;
+  background: var(--bg-code);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.code-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: var(--bg-raised);
+  border-bottom: 1px solid var(--border);
+}
+.code-filename {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+pre {
+  padding: 18px 20px;
+  overflow-x: auto;
+  font-size: 13px;
+  line-height: 1.65;
+}
+code { font-family: 'JetBrains Mono', monospace; }
+.hljs { background: transparent !important; color: var(--text); }
+.hljs-keyword { color: var(--signal); }
+.hljs-comment { color: var(--text-faint); font-style: italic; }
+.hljs-string { color: var(--warm); }
+.hljs-number { color: var(--hot); }
+.hljs-built_in, .hljs-function { color: #c9a8ff; }
+
+/* ===== DIAGRAM ===== */
+.diagram-card {
+  margin-top: 24px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 20px;
+}
+.diagram-card svg { width: 100%; height: auto; display: block; }
+
+/* ===== DASHBOARD EMBED ===== */
+.dash-frame-wrap {
+  margin-top: 24px;
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--bg-raised);
+}
+.dash-frame-wrap iframe {
+  width: 100%;
+  height: 600px;
+  border: 0;
+  display: block;
+}
+.dash-fallback {
+  padding: 40px 24px;
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 14px;
+}
+
+/* ===== BUTTONS ===== */
+.btn-row {
+  margin-top: 24px;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 18px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  text-decoration: none !important;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.btn-primary {
+  background: var(--signal);
+  color: #04201d;
+  border-color: var(--signal);
+}
+.btn-primary:hover { background: #6fe0d5; }
+.btn-ghost {
+  background: var(--bg-raised);
+  color: var(--text);
+}
+.btn-ghost:hover { border-color: var(--text-dim); }
+
+/* ===== TECH TABLE ===== */
+.tech-table { width: 100%; margin-top: 24px; border-collapse: collapse; font-size: 14px; }
+.tech-table th {
+  text-align: left;
+  color: var(--text-faint);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 0 0 10px;
+  border-bottom: 1px solid var(--border);
+}
+.tech-table td {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-dim);
+}
+.tech-table td:first-child { color: var(--text); font-weight: 500; }
+.tech-table td:last-child { color: var(--signal); font-family: 'JetBrains Mono', monospace; font-size: 13px; text-align: right; }
+
+/* ===== FOOTER ===== */
+footer {
+  padding: 48px 0 64px;
+  border-top: 1px solid var(--border);
+  color: var(--text-faint);
+  font-size: 13px;
+}
+footer a { color: var(--text-dim); }
+
+@media (max-width: 600px) {
+  .hero { padding: 70px 0 56px; }
+  .stat-row { gap: 20px; }
+  .signal-row { grid-template-columns: 1fr; gap: 4px; }
+  .signal-tech { grid-column: 1; }
+}
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="pulse-field">
+    <div class="pulse-ring r1"></div>
+    <div class="pulse-ring r2"></div>
+    <div class="pulse-ring r3"></div>
+  </div>
+  <div class="wrap">
+    <div class="eyebrow"><span class="dot live"></span>Portfolio project · automated pipeline, runs every 4 hours</div>
+    <h1>GTM Signal Engine</h1>
+    <p class="hero-sub">A go-to-market signal detection system that scores B2B SaaS accounts from product usage data and routes the ones worth calling straight into HubSpot and Telegram, built on BigQuery SQL and n8n.</p>
+    <div class="stat-row">
+      <div class="stat-critical"><div class="stat-num">25</div><div class="stat-label">critical accounts</div></div>
+      <div class="stat-hot"><div class="stat-num">19</div><div class="stat-label">hot accounts</div></div>
+      <div class="stat-signal"><div class="stat-num">44</div><div class="stat-label">accounts flagged</div></div>
+    </div>
+    <div class="live-strip">
+      <span class="dot live"></span>
+      <span id="countdown-label">Next automated check in <span class="countdown" id="countdown">...</span></span>
+    </div>
+  </div>
+</div>
+
+<section>
+  <div class="wrap">
+    <h2>The problem</h2>
+    <p class="lede">Sales teams waste time guessing which accounts are ready to expand. The data that answers that question already sits in the product's usage logs, but nobody looks at it, because nobody built the pipeline that would surface it. This project is that pipeline, built end to end: SQL scoring, workflow automation, CRM sync, and real-time alerts.</p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Proof it's live</h2>
+    <p class="lede">This isn't a static mockup. The scheduler below fires on its own every four hours, and this is a real alert it sent to Telegram, unedited.</p>
+
+    <div class="proof-card">
+      <div class="proof-head">
+        <div class="proof-avatar">GE</div>
+        <div>
+          <div class="proof-title">GTM Signal Engine</div>
+          <div class="proof-sub">Telegram bot · sent automatically by n8n</div>
+        </div>
+        <span class="proof-badge">AUTOMATED</span>
+      </div>
+      <div class="proof-body" id="telegram-proof">📊 <span class="hl-head">GTM SIGNAL ENGINE REPORT</span>
+Thursday, 29 October 2026 at 07:24 am
+━━━━━━━━━━━━━━━━━━━━━━
+
+📈 Total accounts flagged: 44
+<span class="hl-critical">🔴 Critical (85+): 25</span>
+<span class="hl-hot">🟠 Hot (70-84): 19</span>
+🟡 Warm (50-69): 0
+
+━━ <span class="hl-critical">CRITICAL</span> ━━━━━━━━━
+• PlayFlow: 100 | usage spike + seat crunch + feature milestone
+• Johnson Technologies: 100 | usage spike + seat crunch + feature milestone
+• Hill Technologies: 100 | usage spike + seat crunch + feature milestone
+...and 22 more
+
+━━ <span class="hl-hot">HOT</span> ━━━━━━━━━━━━━
+• Baldwin Technologies: 78 | usage spike + feature milestone
+• SongStack: 72 | seat crunch + feature milestone
+...and 17 more
+
+━━━━━━━━━━━━━━━━━━━━━━
+✅ 44 contacts synced to HubSpot
+⏰ Next check in 4 hours</div>
+      <div class="proof-foot">
+        <span>Sent via n8n → Telegram Bot API</span>
+        <span>Every 4 hours, unattended</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>How scoring works</h2>
+    <p class="lede">Every account is checked daily against three expansion signals. Each signal carries a weight, and accounts triggering more than one get a multiplier, so a company showing every sign of being ready to buy rises straight to the top of the list.</p>
+
+    <div class="signal-list">
+      <div class="signal-row">
+        <span class="signal-pts sp-spike">40 pts</span>
+        <span class="signal-desc"><span class="name">Usage spike</span>Daily active users exceed 2x the 7-day rolling average</span>
+        <span class="signal-tech">AVG() OVER</span>
+      </div>
+      <div class="signal-row">
+        <span class="signal-pts sp-crunch">35 pts</span>
+        <span class="signal-desc"><span class="name">Seat crunch</span>More than 80% of purchased seats are in active use</span>
+        <span class="signal-tech">SAFE_DIVIDE()</span>
+      </div>
+      <div class="signal-row">
+        <span class="signal-pts sp-feature">25 pts</span>
+        <span class="signal-desc"><span class="name">Feature milestone</span>The account has adopted 10 or more product features</span>
+        <span class="signal-tech">MAX() OVER</span>
+      </div>
+    </div>
+
+    <div class="tier-line">
+      <div class="tier-seg critical"></div>
+      <div class="tier-seg hot"></div>
+      <div class="tier-seg warm"></div>
+      <div class="tier-seg cold"></div>
+    </div>
+    <div class="tier-key">
+      <span><i style="background:var(--critical)"></i>Critical, 85+ (25 accounts)</span>
+      <span><i style="background:var(--hot)"></i>Hot, 70–84 (19 accounts)</span>
+      <span><i style="background:var(--warm)"></i>Warm, 50–69 (0 accounts)</span>
+      <span><i style="background:var(--text-faint);opacity:.4"></i>Cold, under 50</span>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>The SQL</h2>
+    <p class="lede">The scoring logic is a single BigQuery view built from three stacked queries: rolling averages, signal detection, and composite scoring. Here's the core of it.</p>
+
+    <div class="code-card">
+      <div class="code-head"><span class="code-filename">sql/03_composite_scoring.sql</span></div>
+      <pre><code class="language-sql">-- 7-day rolling average of daily active users, per company
+AVG(daily_active_users) OVER (
+    PARTITION BY company_id
+    ORDER BY event_date
+    ROWS BETWEEN 6 PRECEDING AND CURRENT ROW
+) AS dau_7d_avg,
+
+-- Usage spike: today's DAU is more than 2x the rolling average
+(dau_7d_avg > 0 AND daily_active_users > dau_7d_avg * 2) AS has_usage_spike,
+
+-- Seat crunch: utilization above 80 percent
+(SAFE_DIVIDE(seats_used, seats_purchased) * 100 > 80) AS has_seat_crunch,
+
+-- Feature milestone: cumulative adoption hits 10+ features
+(MAX(features_used) OVER (
+    PARTITION BY company_id
+    ORDER BY event_date
+    ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+) >= 10) AS has_feature_milestone,
+
+-- Weighted base score, then a multiplier for accounts firing
+-- more than one signal at once
+(CASE WHEN has_usage_spike THEN 40 ELSE 0 END)
++ (CASE WHEN has_seat_crunch THEN 35 ELSE 0 END)
++ (CASE WHEN has_feature_milestone THEN 25 ELSE 0 END) AS base_score,
+
+CASE
+    WHEN signals_firing >= 3 THEN 1.3
+    WHEN signals_firing = 2 THEN 1.2
+    ELSE 1.0
+END AS multiplier,
+
+LEAST(100, ROUND(base_score * multiplier)) AS signal_score</code></pre>
+    </div>
+
+    <div class="btn-row">
+      <a class="btn btn-ghost" href="https://github.com/utkarshkapoor95/gtm-signal-engine/tree/main/sql" target="_blank" rel="noopener">View all 4 SQL files</a>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Architecture</h2>
+    <p class="lede">One BigQuery view feeds three independent consumers: an n8n workflow that syncs CRITICAL and HOT accounts to HubSpot and sends Telegram alerts every four hours, an auto-synced Google Sheets export, and this live dashboard.</p>
+
+    <div class="diagram-card">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 520" role="img" aria-label="Architecture diagram: Python generates a CSV uploaded to BigQuery, which feeds a SQL scoring view, which branches to an n8n workflow (to HubSpot and Telegram), Google Sheets, and Looker Studio.">
+        <style>
+          .dth { font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 500; fill: #e6e9ef; }
+          .dts { font-family: 'Inter', sans-serif; font-size: 12px; fill: #8b93a7; }
+          .darr { stroke: #3a4458; stroke-width: 1.5; fill: none; }
+        </style>
+        <defs>
+          <marker id="hero-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M2 1L8 5L2 9" fill="none" stroke="#3a4458" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </marker>
+        </defs>
+
+        <rect x="240" y="20" width="200" height="50" rx="8" fill="#161c29" stroke="#2a3348"/>
+        <text class="dth" x="340" y="42" text-anchor="middle" dominant-baseline="central">Python generator</text>
+        <text class="dts" x="340" y="58" text-anchor="middle" dominant-baseline="central">75 companies · 90 days</text>
+
+        <line x1="340" y1="70" x2="340" y2="100" class="darr" marker-end="url(#hero-arrow)"/>
+
+        <rect x="210" y="100" width="260" height="50" rx="8" fill="#13233a" stroke="#2a4a6b"/>
+        <text class="dth" x="340" y="118" text-anchor="middle" dominant-baseline="central">BigQuery</text>
+        <text class="dts" x="340" y="134" text-anchor="middle" dominant-baseline="central">usage_events table</text>
+
+        <line x1="340" y1="150" x2="340" y2="180" class="darr" marker-end="url(#hero-arrow)"/>
+
+        <rect x="150" y="180" width="380" height="72" rx="8" fill="#18233b" stroke="#2f4fd1" stroke-opacity="0.4" stroke-width="1.5"/>
+        <text class="dth" x="340" y="203" text-anchor="middle" dominant-baseline="central" style="font-weight:600">SQL: scored_signals view</text>
+        <text class="dts" x="340" y="221" text-anchor="middle" dominant-baseline="central">Window functions · CTEs · composite scoring</text>
+        <text class="dts" x="340" y="238" text-anchor="middle" dominant-baseline="central">Rolling averages → signal flags → 0–100 score</text>
+
+        <path d="M240 252 L240 280 L140 280 L140 310" class="darr" marker-end="url(#hero-arrow)"/>
+        <line x1="340" y1="252" x2="340" y2="310" class="darr" marker-end="url(#hero-arrow)"/>
+        <path d="M440 252 L440 280 L540 280 L540 310" class="darr" marker-end="url(#hero-arrow)"/>
+
+        <rect x="60" y="310" width="160" height="50" rx="8" fill="#161c29" stroke="#2a3348"/>
+        <text class="dth" x="140" y="328" text-anchor="middle" dominant-baseline="central">n8n workflow</text>
+        <text class="dts" x="140" y="344" text-anchor="middle" dominant-baseline="central">Every 4 hours</text>
+
+        <rect x="260" y="310" width="160" height="50" rx="8" fill="#161c29" stroke="#2a3348"/>
+        <text class="dth" x="340" y="328" text-anchor="middle" dominant-baseline="central">Google Sheets</text>
+        <text class="dts" x="340" y="344" text-anchor="middle" dominant-baseline="central">Auto-synced via n8n</text>
+
+        <rect x="460" y="310" width="160" height="50" rx="8" fill="#13302d" stroke="#2a7a72"/>
+        <text class="dth" x="540" y="328" text-anchor="middle" dominant-baseline="central">Looker Studio</text>
+        <text class="dts" x="540" y="344" text-anchor="middle" dominant-baseline="central">This dashboard</text>
+
+        <line x1="420" y1="335" x2="458" y2="335" class="darr" marker-end="url(#hero-arrow)"/>
+
+        <path d="M90 360 L90 390" class="darr" marker-end="url(#hero-arrow)"/>
+        <path d="M190 360 L190 375 L250 375 L250 390" class="darr" marker-end="url(#hero-arrow)"/>
+
+        <rect x="20" y="390" width="140" height="50" rx="8" fill="#161c29" stroke="#2a3348"/>
+        <text class="dth" x="90" y="408" text-anchor="middle" dominant-baseline="central">HubSpot</text>
+        <text class="dts" x="90" y="424" text-anchor="middle" dominant-baseline="central">CRM upsert</text>
+
+        <rect x="180" y="390" width="140" height="50" rx="8" fill="#161c29" stroke="#2a3348"/>
+        <text class="dth" x="250" y="408" text-anchor="middle" dominant-baseline="central">Telegram</text>
+        <text class="dts" x="250" y="424" text-anchor="middle" dominant-baseline="central">Signal alerts</text>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Live dashboard</h2>
+    <p class="lede">Filter by tier or plan, sort the account table by score, and see exactly which companies the system is flagging right now.</p>
+
+    <div class="dash-frame-wrap">
+      <iframe
+        src="https://lookerstudio.google.com/embed/reporting/fb13f007-f483-4c44-a8b1-f3c2e506354f/page/TCFCG"
+        loading="lazy"
+        allowfullscreen
+        title="GTM Signal Engine Dashboard">
+      </iframe>
+    </div>
+    <div class="btn-row">
+      <a class="btn btn-primary" href="https://lookerstudio.google.com/reporting/fb13f007-f483-4c44-a8b1-f3c2e506354f" target="_blank" rel="noopener">Open full dashboard</a>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Try it yourself</h2>
+    <p class="lede">Download the sample dataset, upload it to a free BigQuery Sandbox project, and run the scoring view yourself. No billing account required.</p>
+
+    <div class="btn-row">
+      <a class="btn btn-primary" href="https://raw.githubusercontent.com/utkarshkapoor95/gtm-signal-engine/main/data/sample_usage_events.csv" download>Download sample CSV</a>
+      <a class="btn btn-ghost" href="https://docs.google.com/spreadsheets/d/1T5vkVEWrz7JH7LGlGd3WnlWUFr7sWRBNbfTBiclDjrE/edit?usp=sharing" target="_blank" rel="noopener">View live results sheet</a>
+      <a class="btn btn-ghost" href="https://github.com/utkarshkapoor95/gtm-signal-engine" target="_blank" rel="noopener">View full repo on GitHub</a>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Built with</h2>
+    <table class="tech-table">
+      <tr><th>Component</th><th></th><th>Cost</th></tr>
+      <tr><td>Data warehouse</td><td>BigQuery Sandbox</td><td>Free</td></tr>
+      <tr><td>Scoring logic</td><td>BigQuery SQL</td><td>Free</td></tr>
+      <tr><td>Data generation</td><td>Python + Faker + Pandas</td><td>Free</td></tr>
+      <tr><td>Orchestration</td><td>n8n, self-hosted</td><td>$6/mo</td></tr>
+      <tr><td>CRM</td><td>HubSpot Free</td><td>Free</td></tr>
+      <tr><td>Alerts</td><td>Telegram Bot API</td><td>Free</td></tr>
+      <tr><td>Dashboard</td><td>Looker Studio + Sheets</td><td>Free</td></tr>
+    </table>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    Built by Utkarsh Kapoor · Founder, <a href="https://autothynk.com" target="_blank" rel="noopener">Autothynk</a> ·
+    <a href="https://github.com/utkarshkapoor95/gtm-signal-engine" target="_blank" rel="noopener">View on GitHub</a>
+  </div>
+</footer>
+
+<script>
+hljs.highlightAll();
+
+// Live countdown to the next 4-hour scheduled run.
+// Anchor: a confirmed real run at 2026-10-29T07:24:00+05:30 (IST), repeating every 4 hours.
+(function () {
+  var anchor = new Date('2026-10-29T07:24:00+05:30').getTime();
+  var fourHoursMs = 4 * 60 * 60 * 1000;
+  var el = document.getElementById('countdown');
+  if (!el) return;
+
+  function tick() {
+    var now = Date.now();
+    var elapsed = now - anchor;
+    var cyclePos = ((elapsed % fourHoursMs) + fourHoursMs) % fourHoursMs;
+    var remainingMs = fourHoursMs - cyclePos;
+    var h = Math.floor(remainingMs / 3600000);
+    var m = Math.floor((remainingMs % 3600000) / 60000);
+    var s = Math.floor((remainingMs % 60000) / 1000);
+    el.textContent = h + 'h ' + (m < 10 ? '0' : '') + m + 'm ' + (s < 10 ? '0' : '') + s + 's';
+  }
+  tick();
+  setInterval(tick, 1000);
+})();
+</script>
+</body>
+</html>
